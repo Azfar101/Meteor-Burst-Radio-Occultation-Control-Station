@@ -17,3 +17,5 @@ deploy/
 *.csv
 csv/
 *.0001_nc
+backend/data/uploads/
+backend/data/cache/
