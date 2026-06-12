@@ -65,6 +65,14 @@ body.light .rp-head {
 }
 body.light .maplibregl-ctrl-attrib { background: rgba(255,255,255,0.7) !important; }
 body.light ::-webkit-scrollbar-thumb { background: rgba(40, 80, 130, 0.3); }
+body.light .btn.primary {
+  background: linear-gradient(135deg, #0e7490, #155e75);
+  color: #e0faff;
+}
+body.light .btn.primary:hover { filter: brightness(1.15); background: linear-gradient(135deg, #0e7490, #155e75); }
+body.light .viewer3d {
+  background: radial-gradient(ellipse at 50% 0%, #cce8f6, #e4f2fb 75%);
+}
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; overflow: hidden; }

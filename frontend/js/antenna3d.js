@@ -43,7 +43,8 @@ export class AntennaView {
     this.controls.enableDamping = true;
 
     // lights
-    this.scene.add(new THREE.HemisphereLight(0x8fb7e8, 0x0a1422, 0.85));
+    this._hemi = new THREE.HemisphereLight(0x8fb7e8, 0x0a1422, 0.85);
+    this.scene.add(this._hemi);
     const key = new THREE.DirectionalLight(0xcfe8ff, 1.5);
     key.position.set(4, 7, 3);
     this.scene.add(key);
@@ -55,6 +56,12 @@ export class AntennaView {
     this._buildStation();
     this._buildAntenna();
 
+    // sync to current theme and watch for changes
+    this.setTheme(document.body.classList.contains("light"));
+    this._themeObs = new MutationObserver(() =>
+      this.setTheme(document.body.classList.contains("light")));
+    this._themeObs.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+
     this._resizeObs = new ResizeObserver(() => this._resize());
     this._resizeObs.observe(container);
 
@@ -63,13 +70,12 @@ export class AntennaView {
   }
 
   _buildGround() {
-    const grid = new THREE.PolarGridHelper(5.5, 12, 7, 48, 0x1d3a5c, 0x16293f);
-    grid.position.y = 0.001;
-    this.scene.add(grid);
+    this._grid = new THREE.PolarGridHelper(5.5, 12, 7, 48, 0x1d3a5c, 0x16293f);
+    this._grid.position.y = 0.001;
+    this.scene.add(this._grid);
 
-    const disc = new THREE.Mesh(
-      new THREE.CircleGeometry(5.5, 48),
-      new THREE.MeshStandardMaterial({ color: 0x0a1322, roughness: 0.95 }));
+    this._discMat = new THREE.MeshStandardMaterial({ color: 0x0a1322, roughness: 0.95 });
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(5.5, 48), this._discMat);
     disc.rotation.x = -Math.PI / 2;
     this.scene.add(disc);
 
@@ -205,6 +211,23 @@ export class AntennaView {
     this.pitch.add(this.beam);
   }
 
+  setTheme(isLight) {
+    this.scene.fog.color.setHex(isLight ? 0xe4f2fb : 0x060b14);
+    this._hemi.color.setHex(isLight ? 0xd0ecff : 0x8fb7e8);
+    this._hemi.groundColor.setHex(isLight ? 0xa0c8e0 : 0x0a1422);
+    this._discMat.color.setHex(isLight ? 0xb8d8ec : 0x0a1322);
+
+    const g1 = isLight ? 0x7aaecf : 0x1d3a5c;
+    const g2 = isLight ? 0x5890b8 : 0x16293f;
+    this.scene.remove(this._grid);
+    this._grid.geometry.dispose();
+    const mats = Array.isArray(this._grid.material) ? this._grid.material : [this._grid.material];
+    mats.forEach(m => m.dispose());
+    this._grid = new THREE.PolarGridHelper(5.5, 12, 7, 48, g1, g2);
+    this._grid.position.y = 0.001;
+    this.scene.add(this._grid);
+  }
+
   setPointing(azDeg, elDeg) {
     this.targetAz = azDeg;
     this.targetEl = Math.max(0, Math.min(85, elDeg));
@@ -252,6 +275,7 @@ export class AntennaView {
   dispose() {
     this._disposed = true;
     this._resizeObs.disconnect();
+    this._themeObs.disconnect();
     this.controls.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
