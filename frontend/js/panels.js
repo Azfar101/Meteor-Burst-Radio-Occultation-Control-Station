@@ -5,7 +5,7 @@ import { state, on, emit, stationById, timeISO, toast, escapeHtml } from "./stat
 import { api } from "./api.js";
 import {
   flyToStation, showCoverage, clearCoverage, coverageShownFor,
-  drawRoute, clearRoute, startTransmit, stopTransmit,
+  drawRoute, clearRoute, startTransmit, stopTransmit, syncStations,
 } from "./map.js";
 import { AntennaView } from "./antenna3d.js";
 
@@ -75,16 +75,19 @@ export function openStationPanel(id) {
       <button class="x" data-act="close">✕</button>
     </div>
     <div class="rp-body">
-      ${sim
-        ? `<input class="rp-name-input" data-k="name" value="${escapeHtml(s.name)}">`
-        : `<div style="font-weight:700;font-size:14px;margin-bottom:4px">${escapeHtml(s.name)}</div>`}
-      <div class="rp-sub">${escapeHtml(s.region)} · <span class="mono">${s.lat.toFixed(3)}°, ${s.lon.toFixed(3)}°</span>
-        · ${escapeHtml(s.antenna?.type || "Yagi array")}</div>
+      <input class="rp-name-input" data-k="name" value="${escapeHtml(s.name)}">
+      <div class="rp-sub">${escapeHtml(s.region)} · ${escapeHtml(s.antenna?.type || "Yagi array")}</div>
+      <div class="rp-sub" title="The station tunes within this band; each hop picks the best supported frequency">
+        Operating band · <span class="mono">${state.settings.freq_min_mhz}–${state.settings.freq_max_mhz} MHz</span></div>
+      <div class="row two">
+        <div><label class="lbl">Latitude</label><input data-k="lat-in" type="number" step="0.01" value="${s.lat}"></div>
+        <div><label class="lbl">Longitude</label><input data-k="lon-in" type="number" step="0.01" value="${s.lon}"></div>
+      </div>
 
       <div class="viewer3d" data-k="v3d">
         <span class="v3d-tag">ANTENNA · LIVE ATTITUDE</span>
         <div class="v3d-point">
-          <span data-k="az">AZ —</span><span data-k="el">EL —</span><span data-k="target">PARKED</span>
+          <span data-k="az">AZ —</span><span data-k="el">EL —</span><span data-k="target">PARKED</span><span data-k="freq"></span>
         </div>
       </div>
 
@@ -103,7 +106,7 @@ export function openStationPanel(id) {
         <button class="btn" data-act="coverage">◎ Coverage</button>
         <button class="btn" data-act="src">⇡ Set source</button>
         <button class="btn" data-act="dst">⇣ Set destination</button>
-        ${sim ? `<button class="btn danger" data-act="del">✕ Remove station</button>` : ""}
+        <button class="btn danger" data-act="del">✕ Remove station</button>
       </div>
     </div>`;
   rp().classList.add("open");
@@ -123,8 +126,8 @@ export function openStationPanel(id) {
       if (c) {
         e.target.textContent = "◎ Hide coverage";
         toast(c.iono_supported
-          ? `Reach ${Math.round(c.min_km)}–${Math.round(c.max_km)} km · fp ${c.fp_mhz} MHz (${c.source})`
-          : `E-layer too weak at ${c.f_op_mhz} MHz here — meteor-burst mode only (max ${Math.round(c.max_km)} km)`,
+          ? `Reach ${Math.round(c.min_km)}–${Math.round(c.max_km)} km · fp ${c.fp_mhz} MHz · max usable ${c.muf_max_mhz} MHz (${c.source})`
+          : `Max usable ${c.muf_max_mhz} MHz < ${c.f_min_mhz} MHz min op freq here — meteor-burst only (max ${Math.round(c.max_km)} km)`,
           c.iono_supported ? "ok" : "");
       }
     }
@@ -141,6 +144,22 @@ export function openStationPanel(id) {
       toast("Station renamed", "ok");
     } catch (err) { toast(err.message, "err"); }
   });
+
+  const savePos = async () => {
+    const lat = +rp().querySelector("[data-k=lat-in]").value;
+    const lon = +rp().querySelector("[data-k=lon-in]").value;
+    if (Number.isNaN(lat) || Number.isNaN(lon)) return;
+    try {
+      await api.updateStation(id, { lat, lon });
+      const st = stationById(id);
+      if (st) { st.lat = lat; st.lon = lon; }
+      syncStations();                       // move the marker
+      emit("stations:moved", { id });       // re-render sidebar + recompute route
+      toast("Station moved", "ok");
+    } catch (err) { toast(err.message, "err"); }
+  };
+  rp().querySelector("[data-k=lat-in]")?.addEventListener("change", savePos);
+  rp().querySelector("[data-k=lon-in]")?.addEventListener("change", savePos);
 
   updateStationPanel();
 }
@@ -177,6 +196,7 @@ export function updateStationPanel() {
   set("az", `AZ ${pt.az.toFixed(1)}°`);
   set("el", `EL ${pt.el.toFixed(1)}°`);
   set("target", pt.target ? `→ ${pt.target}` : "PARKED");
+  set("freq", pt.frequency_mhz ? ` · ${pt.frequency_mhz.toFixed(2)} MHz` : "");
 
   if (antennaView) {
     antennaView.setPointing(pt.az, pt.el);
@@ -272,6 +292,7 @@ function hopCard(h, i) {
       <span class="hc-route">${escapeHtml(h.from_code)} → ${escapeHtml(h.to_code)}</span>
       ${modePill(h.mode)}
       <span class="src-tag src-${r.source}" title="ionosphere data source">${r.source.toUpperCase()}</span>
+      ${r.cosmic2_backed ? `<span class="src-tag backed-tag" title="Reflection backed by a measured COSMIC-2 patch${r.backed ? ` · ${r.backed.dist_km} km away` : ""}">◉ BACKED</span>` : ""}
     </div>
     <div class="hc-grid">
       <div><span class="k">Distance</span><span class="v">${Math.round(h.distance_km)} km</span></div>
@@ -281,6 +302,7 @@ function hopCard(h, i) {
       <div><span class="k">Refl. height</span><span class="v">${r.h_km} km</span></div>
       <div><span class="k">Plasma freq</span><span class="v">${r.fp_mhz} MHz</span></div>
       <div><span class="k">MUF (sec law)</span><span class="v">${h.muf_mhz} MHz</span></div>
+      <div><span class="k">Op frequency</span><span class="v" title="Adaptively chosen within the ${h.f_min_mhz}–${h.f_max_mhz} MHz station range">${h.f_used_mhz} MHz</span></div>
       <div><span class="k">Margin</span><span class="v">${h.margin_db} dB</span></div>
       <div><span class="k">Duty cycle</span><span class="v">${h.duty_cycle_pct}%</span></div>
       <div><span class="k">Throughput</span><span class="v">${h.throughput_kbps} kbps</span></div>
@@ -299,6 +321,72 @@ function directBlock(d) {
       </div>
       <div class="hint" style="margin-top:7px">${d.reasons.map(escapeHtml).join("<br>")}</div>
     </div>`;
+}
+
+// ════════════════════════ RIGHT PANEL: MBG POINT ═════════════════════
+
+export function openMbgPanel(id) {
+  const m = state.mbg.find((x) => x.id === id);
+  if (!m) return;
+  destroyAntenna();
+  panelKind = "mbg";
+  rp().innerHTML = `
+    <div class="rp-head">
+      <span class="code">◆ <span data-k="title">${escapeHtml(m.name)}</span></span>
+      <span class="pill mode-mb">MBG POINT</span>
+      <button class="x" data-act="close">✕</button>
+    </div>
+    <div class="rp-body">
+      <div class="rp-sub">Custom meteor-burst bounce point — usable as a reflection point
+        when “bounce off footprints” is on.</div>
+      <div class="row"><label class="lbl">Name</label><input id="mbg-name" type="text" value="${escapeHtml(m.name)}"></div>
+      <div class="row two">
+        <div><label class="lbl">Latitude</label><input id="mbg-lat" type="number" step="0.01" value="${m.lat}"></div>
+        <div><label class="lbl">Longitude</label><input id="mbg-lon" type="number" step="0.01" value="${m.lon}"></div>
+      </div>
+      <div class="row two">
+        <div><label class="lbl">Height (km)</label><input id="mbg-h" type="number" step="1" value="${m.h_km}"></div>
+        <div><label class="lbl">Plasma freq (MHz)</label><input id="mbg-fp" type="number" step="0.1" value="${m.fp_mhz}"></div>
+      </div>
+      <div class="hint" id="mbg-info"></div>
+      <div class="rp-actions">
+        <button class="btn primary" data-act="save">Save changes</button>
+        <button class="btn danger" data-act="del">✕ Delete point</button>
+      </div>
+    </div>`;
+  rp().classList.add("open");
+
+  const q = (sel) => rp().querySelector(sel);
+  const refreshInfo = () => {
+    const fp = +q("#mbg-fp").value, h = +q("#mbg-h").value;
+    const muf = fp / Math.sqrt(1 - (6371 / (6371 + h)) ** 2);
+    q("#mbg-info").innerHTML = `Max usable operating frequency ≈ <b>${muf.toFixed(1)} MHz</b>
+      (at grazing geometry). Min op freq to stay usable: ≤ that value.`;
+  };
+  refreshInfo();
+  q("#mbg-fp").addEventListener("input", refreshInfo);
+  q("#mbg-h").addEventListener("input", refreshInfo);
+
+  q("[data-act=close]").addEventListener("click", closePanel);
+  q("[data-act=save]").addEventListener("click", async () => {
+    try {
+      await api.updateMbg(id, {
+        name: q("#mbg-name").value,
+        lat: +q("#mbg-lat").value, lon: +q("#mbg-lon").value,
+        h_km: +q("#mbg-h").value, fp_mhz: +q("#mbg-fp").value,
+      });
+      emit("mbg:reload");
+      toast("MBG point updated", "ok");
+    } catch (e) { toast(e.message, "err"); }
+  });
+  q("[data-act=del]").addEventListener("click", async () => {
+    try {
+      await api.deleteMbg(id);
+      emit("mbg:reload");
+      closePanel();
+      toast("MBG point removed", "ok");
+    } catch (e) { toast(e.message, "err"); }
+  });
 }
 
 // ════════════════════════ PANEL LIFECYCLE ════════════════════════════
@@ -333,10 +421,14 @@ export function openSettingsModal() {
   const m = modal(`
     <h2>SYSTEM SETTINGS</h2>
     <div class="row">
-      <label class="lbl">Operating frequency — <span class="range-val" id="set-freq-val">${s.freq_mhz} MHz</span></label>
-      <input type="range" id="set-freq" min="15" max="60" step="0.5" value="${s.freq_mhz}">
-      <div class="hint">Meteor-burst systems typically run 30–50 MHz. The secant law
-        fp·sec(θ) ≥ f decides whether the E-layer supports each hop.</div>
+      <label class="lbl">Operating frequency range — <span class="range-val" id="set-freq-val">${s.freq_min_mhz}–${s.freq_max_mhz} MHz</span></label>
+      <div class="dual-range">
+        <input type="range" id="set-freq-min" min="15" max="60" step="1" value="${s.freq_min_mhz}">
+        <input type="range" id="set-freq-max" min="15" max="60" step="1" value="${s.freq_max_mhz}">
+      </div>
+      <div class="hint">Each hop adaptively tunes to the best frequency in this band.
+        The minimum (also the live “Min op freq” slider) widens reach and decides which
+        patches are usable; the secant law fp·sec(θ) ≥ f decides E-layer support.</div>
     </div>
     <div class="row">
       <label class="lbl">Max relay hops</label>
@@ -361,15 +453,27 @@ export function openSettingsModal() {
       <label class="check"><input type="checkbox" id="set-mb" ${s.allow_meteor_mode ? "checked" : ""}>
         Allow meteor-burst mode (links without continuous E-layer support)</label>
     </div>
+    <div class="row">
+      <label class="check"><input type="checkbox" id="set-bounce" ${s.use_footprints_bounce ? "checked" : ""}>
+        Bounce links off visible footprints (use real/placed meteor-burst points as
+        reflection points instead of the great-circle midpoint)</label>
+    </div>
     <div class="actions">
       <button class="btn danger" id="set-reset">Reset network</button>
       <button class="btn" id="set-cancel">Cancel</button>
       <button class="btn primary" id="set-save">Save</button>
     </div>`);
 
-  m.querySelector("#set-freq").addEventListener("input", (e) => {
-    m.querySelector("#set-freq-val").textContent = `${e.target.value} MHz`;
-  });
+  const fMin = m.querySelector("#set-freq-min");
+  const fMax = m.querySelector("#set-freq-max");
+  const fVal = m.querySelector("#set-freq-val");
+  const syncFreq = (driver) => {
+    let lo = +fMin.value, hi = +fMax.value;
+    if (lo > hi) { if (driver === "min") hi = lo, fMax.value = String(hi); else lo = hi, fMin.value = String(lo); }
+    fVal.textContent = `${lo}–${hi} MHz`;
+  };
+  fMin.addEventListener("input", () => syncFreq("min"));
+  fMax.addEventListener("input", () => syncFreq("max"));
   m.querySelector("#set-ssn").addEventListener("input", (e) => {
     m.querySelector("#set-ssn-val").textContent = e.target.value;
   });
@@ -385,12 +489,14 @@ export function openSettingsModal() {
   m.querySelector("#set-save").addEventListener("click", async () => {
     try {
       const saved = await api.saveSettings({
-        freq_mhz: +m.querySelector("#set-freq").value,
+        freq_min_mhz: +fMin.value,
+        freq_max_mhz: +fMax.value,
         max_hops: +m.querySelector("#set-hops").value,
         data_rate_kbps: +m.querySelector("#set-rate").value,
         ssn: +m.querySelector("#set-ssn").value,
         auto_ssn: m.querySelector("#set-autossn").checked,
         allow_meteor_mode: m.querySelector("#set-mb").checked,
+        use_footprints_bounce: m.querySelector("#set-bounce").checked,
       });
       Object.assign(state.settings, saved);
       emit("settings");
@@ -400,15 +506,156 @@ export function openSettingsModal() {
   });
 }
 
+// ──────────── AUTO-FETCH CONTROLLER (UCAR archive) ────────────
+// A single background poller, kept at module scope so progress keeps
+// streaming into the map even if the import modal is closed mid-fetch.
+let fetchTimer = null;
+let lastFetchProfiles = null;
+
+function startFetchPoll() {
+  if (fetchTimer) return;
+  fetchTimer = setInterval(pollFetch, 1200);
+}
+function stopFetchPoll() {
+  if (fetchTimer) { clearInterval(fetchTimer); fetchTimer = null; }
+}
+
+async function pollFetch() {
+  let s;
+  try { s = await api.fetchStatus(); }
+  catch { return; }              // server hiccup — try again next tick
+  renderFetchProgress(s);
+  // stream freshly-landed profiles onto the map as each day completes
+  if (s.total_profiles != null && s.total_profiles !== lastFetchProfiles) {
+    lastFetchProfiles = s.total_profiles;
+    emit("profiles:reload");
+  }
+  if (!s.running) {
+    stopFetchPoll();
+    setFetchBusy(false);
+    if (s.phase === "done") {
+      toast(`Auto-fetch complete · ${s.imported} new profile(s)`, "ok");
+    } else if (s.phase === "cancelled") {
+      toast("Auto-fetch cancelled", "");
+    } else if (s.phase === "error") {
+      toast(`Auto-fetch failed: ${s.error || "unknown error"}`, "err");
+    }
+    emit("profiles:reload");
+  }
+}
+
+function setFetchBusy(busy) {
+  const go = document.getElementById("fetch-go");
+  const cancel = document.getElementById("fetch-cancel");
+  if (go) { go.disabled = busy; go.style.display = busy ? "none" : ""; }
+  if (cancel) cancel.style.display = busy ? "" : "none";
+}
+
+function renderFetchProgress(s) {
+  const box = document.getElementById("fetch-progress");
+  if (!box) return;             // modal closed — nothing to draw
+  if (!s || s.phase === "idle" || !s.total_days) { box.innerHTML = ""; return; }
+  const pct = Math.max(0, Math.min(100, s.pct || 0));
+  const cls = s.phase === "error" ? "err" : s.phase === "cancelled" ? "warn" : "";
+  const dayDots = (s.days || []).map((d) => {
+    const title = `${d.date} (DOY ${d.doy}) — ${d.status}`
+      + (d.imported ? `, ${d.imported} profiles` : "")
+      + (d.error ? `: ${d.error}` : "");
+    return `<span class="fday ${d.status}" title="${escapeHtml(title)}"></span>`;
+  }).join("");
+  box.innerHTML = `
+    <div class="fetch-status ${cls}">
+      <div class="fetch-msg">${escapeHtml(s.message || "")}</div>
+      <div class="fetch-bar"><span style="width:${pct}%"></span></div>
+      <div class="fetch-days">${dayDots}</div>
+      <div class="fetch-tally">
+        Imported <b>${s.imported}</b>${s.duplicates ? ` · ${s.duplicates} dup` : ""}${s.skipped_total ? ` · ${s.skipped_total} skipped` : ""}
+        ${s.total_profiles != null ? ` · loaded total <b>${s.total_profiles}</b>` : ""}
+        ${s.time_min ? `<br>Coverage: <span class="mono">${s.time_min.slice(0, 16)}Z → ${s.time_max.slice(0, 16)}Z</span>` : ""}
+      </div>
+    </div>`;
+}
+
+function wireFetchPane(m) {
+  const go = m.querySelector("#fetch-go");
+  const cancel = m.querySelector("#fetch-cancel");
+
+  go.addEventListener("click", async () => {
+    const start = m.querySelector("#fetch-start").value;
+    const end = m.querySelector("#fetch-end").value;
+    if (!start || !end) { toast("Pick a start and end date", "err"); return; }
+    setFetchBusy(true);
+    try {
+      const s = await api.fetchStart(start, end);
+      lastFetchProfiles = s.total_profiles;
+      renderFetchProgress(s);
+      startFetchPoll();
+    } catch (e) {
+      setFetchBusy(false);
+      toast(e.message, "err");
+    }
+  });
+
+  cancel.addEventListener("click", async () => {
+    cancel.disabled = true;
+    try { await api.fetchCancel(); } catch (e) { toast(e.message, "err"); }
+    cancel.disabled = false;
+  });
+
+  // If a fetch is already in flight (e.g. modal was reopened), resume the view.
+  api.fetchStatus().then((s) => {
+    if (s && s.running) {
+      lastFetchProfiles = s.total_profiles;
+      setFetchBusy(true);
+      renderFetchProgress(s);
+      startFetchPoll();
+    } else if (s && s.phase !== "idle") {
+      renderFetchProgress(s);     // show the last result
+    }
+  }).catch(() => {});
+}
+
+// Default the auto-fetch range to the last few complete UTC days.
+function defaultFetchRange() {
+  const today = new Date();
+  const iso = (d) => d.toISOString().slice(0, 10);
+  const end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - 1));
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - 2);
+  return { start: iso(start), end: iso(end), max: iso(today) };
+}
+
 export function openImportModal() {
   const lastFolder = localStorage.getItem("mbc-folder") || "asd";
+  const fr = defaultFetchRange();
   const m = modal(`
-    <h2>IMPORT COSMIC-2 IONPRF DATA</h2>
+    <h2>COSMIC-2 IONPRF DATA</h2>
     <div class="tabs">
-      <button class="active" data-tab="folder">Folder on this PC</button>
+      <button class="active" data-tab="fetch">Auto-fetch (UCAR)</button>
+      <button data-tab="folder">Folder on this PC</button>
       <button data-tab="upload">Upload files</button>
+      <button data-tab="csv">CSV</button>
     </div>
-    <div data-pane="folder">
+    <div data-pane="fetch">
+      <div class="row">
+        <label class="lbl">Date range (UTC) — auto-download from the UCAR archive</label>
+        <div class="date-range">
+          <input type="date" id="fetch-start" value="${fr.start}" max="${fr.max}">
+          <span class="date-sep">→</span>
+          <input type="date" id="fetch-end" value="${fr.end}" max="${fr.max}">
+        </div>
+        <div class="hint">Pulls one ionPrf archive per day from
+          <span class="mono">data.cosmic.ucar.edu</span>, extracts it, and runs the same
+          E-region + meteor-spike pipeline. Up to <b>31</b> days per fetch; recent days may
+          not be published yet. Archives are cached locally after the first download.</div>
+      </div>
+      <div class="actions" style="justify-content:flex-start">
+        <button class="btn primary" id="fetch-go">⬇ Fetch &amp; process</button>
+        <button class="btn danger" id="fetch-cancel" style="display:none">■ Cancel</button>
+      </div>
+      <div id="fetch-progress"></div>
+    </div>
+    <div data-pane="folder" style="display:none">
       <div class="row">
         <label class="lbl">Folder path containing *_nc files</label>
         <input type="text" id="imp-folder" value="${escapeHtml(lastFolder)}" spellcheck="false">
@@ -421,18 +668,39 @@ export function openImportModal() {
       <div class="dropzone" id="imp-drop">Drop ionPrf files here or click to browse</div>
       <input type="file" id="imp-files" multiple style="display:none">
     </div>
+    <div data-pane="csv" style="display:none">
+      <div class="row">
+        <label class="lbl">Save / restore the processed profile table</label>
+        <div class="hint">Exports every loaded profile (location, plasma freq, reflection
+          height, burst radius, verdict, scores) to one CSV — re-importable here with no
+          NetCDF files needed. Raw electron-density arrays are not included.</div>
+      </div>
+      <div class="actions" style="justify-content:flex-start">
+        <button class="btn primary" id="csv-export">⬇ Export CSV</button>
+        <button class="btn" id="csv-import-btn">⬆ Import CSV</button>
+        <input type="file" id="csv-file" accept=".csv,text/csv" style="display:none">
+      </div>
+    </div>
     <div id="imp-result"></div>
     <div class="actions" style="margin-top:8px">
       <button class="btn danger" id="imp-clear">Clear loaded data</button>
       <button class="btn" id="imp-close">Close</button>
     </div>`);
 
-  const panes = { folder: m.querySelector("[data-pane=folder]"), upload: m.querySelector("[data-pane=upload]") };
+  const panes = {
+    fetch: m.querySelector("[data-pane=fetch]"),
+    folder: m.querySelector("[data-pane=folder]"),
+    upload: m.querySelector("[data-pane=upload]"),
+    csv: m.querySelector("[data-pane=csv]"),
+  };
   m.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
     m.querySelectorAll(".tabs button").forEach((x) => x.classList.remove("active"));
     b.classList.add("active");
     for (const k of Object.keys(panes)) panes[k].style.display = k === b.dataset.tab ? "" : "none";
   }));
+
+  // ── auto-fetch from the UCAR archive ──
+  wireFetchPane(m);
 
   const showResult = (r) => {
     m.querySelector("#imp-result").innerHTML = `<div class="import-result">
@@ -481,6 +749,28 @@ export function openImportModal() {
     doUpload([...e.dataTransfer.files]);
   });
   fileInput.addEventListener("change", () => doUpload([...fileInput.files]));
+
+  // ── CSV export / import ──
+  m.querySelector("#csv-export").addEventListener("click", () => {
+    if (!state.profiles.length) { toast("No profiles loaded to export", "err"); return; }
+    const a = document.createElement("a");
+    a.href = api.exportCsvUrl;
+    a.download = "cosmic2_profiles.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    toast(`Exporting ${state.profiles.length} profile(s) to CSV`, "ok");
+  });
+  const csvFile = m.querySelector("#csv-file");
+  m.querySelector("#csv-import-btn").addEventListener("click", () => csvFile.click());
+  csvFile.addEventListener("change", async () => {
+    if (!csvFile.files.length) return;
+    const fd = new FormData();
+    for (const f of csvFile.files) fd.append("files", f);
+    try { showResult(await api.importCsv(fd)); }
+    catch (err) { showErr(err); }
+    csvFile.value = "";
+  });
 
   m.querySelector("#imp-clear").addEventListener("click", async () => {
     await api.clearProfiles();

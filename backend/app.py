@@ -11,12 +11,13 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, UploadFile, File
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import cosmic2_loader, geometry as geo, linkplan, livedata
+from . import cosmic2_csv, cosmic2_fetch, cosmic2_loader, geometry as geo, linkplan, livedata
 from .ionosphere import Ionosphere
+from .mbg import MBGStore
 from .stations import StationStore
 
 app = FastAPI(title="MBC Ground Control System", version="1.1")
@@ -27,13 +28,19 @@ UPLOAD_DIR = Path(__file__).resolve().parent / "data" / "uploads"
 iono = Ionosphere()
 iono.live_fn = livedata.get_live
 store = StationStore()
+mbg = MBGStore()
 settings = {
-    "freq_mhz": 30.0,
+    # Operating frequency is a tunable RANGE: each hop adaptively picks the best
+    # frequency in [freq_min, freq_max]. freq_min doubles as the "usable patch"
+    # threshold (a patch is usable iff its max usable freq >= freq_min).
+    "freq_min_mhz": 25.0,
+    "freq_max_mhz": 45.0,
     "data_rate_kbps": 9.6,
     "max_hops": 6,
     "allow_meteor_mode": True,
     "ssn": 70,
     "auto_ssn": True,   # drive the foE model with the live effective SSN
+    "use_footprints_bounce": False,  # bounce off visible footprints instead of the midpoint
 }
 
 
@@ -70,12 +77,14 @@ def _profile_json(p):
 # ── settings ─────────────────────────────────────────────────────────────────
 
 class SettingsIn(BaseModel):
-    freq_mhz: Optional[float] = None
+    freq_min_mhz: Optional[float] = None
+    freq_max_mhz: Optional[float] = None
     data_rate_kbps: Optional[float] = None
     max_hops: Optional[int] = None
     allow_meteor_mode: Optional[bool] = None
     ssn: Optional[float] = None
     auto_ssn: Optional[bool] = None
+    use_footprints_bounce: Optional[bool] = None
 
 
 @app.get("/api/settings")
@@ -87,7 +96,10 @@ def get_settings():
 def patch_settings(body: SettingsIn):
     for k, v in body.model_dump(exclude_none=True).items():
         settings[k] = v
-    settings["freq_mhz"] = max(15.0, min(60.0, float(settings["freq_mhz"])))
+    fmin = max(15.0, min(60.0, float(settings["freq_min_mhz"])))
+    fmax = max(15.0, min(60.0, float(settings["freq_max_mhz"])))
+    settings["freq_min_mhz"] = min(fmin, fmax)
+    settings["freq_max_mhz"] = max(fmin, fmax)
     settings["max_hops"] = max(1, min(10, int(settings["max_hops"])))
     return settings
 
@@ -134,6 +146,57 @@ def reset_stations():
     return store.all()
 
 
+# ── custom MBG bounce points ──────────────────────────────────────────────────
+
+class MBGIn(BaseModel):
+    name: Optional[str] = None
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    h_km: Optional[float] = None
+    fp_mhz: Optional[float] = None
+
+
+@app.get("/api/mbg")
+def list_mbg():
+    return mbg.all()
+
+
+@app.post("/api/mbg")
+def add_mbg(body: MBGIn):
+    if body.lat is None or body.lon is None:
+        raise HTTPException(400, "lat and lon are required")
+    return mbg.add(body.lat, body.lon, body.h_km, body.fp_mhz, body.name)
+
+
+@app.patch("/api/mbg/{mid}")
+def update_mbg(mid: str, body: MBGIn):
+    m = mbg.update(mid, body.model_dump())
+    if not m:
+        raise HTTPException(404, "MBG point not found")
+    return m
+
+
+@app.delete("/api/mbg/{mid}")
+def delete_mbg(mid: str):
+    if not mbg.delete(mid):
+        raise HTTPException(404, "MBG point not found")
+    return {"ok": True}
+
+
+def _bounce_pts():
+    """Visible footprints usable as bounce points (when the setting is on)."""
+    if not settings.get("use_footprints_bounce"):
+        return None
+    f_min = settings["freq_min_mhz"]
+    pts = iono.usable_patches(f_min)
+    for m in mbg.all():
+        sec_max = geo.sec_max(m["h_km"])
+        if m["fp_mhz"] * sec_max >= f_min:
+            pts.append({"lat": m["lat"], "lon": m["lon"],
+                        "h_km": m["h_km"], "fp_mhz": m["fp_mhz"], "source": "mbg"})
+    return pts
+
+
 @app.get("/api/telemetry")
 def telemetry():
     return store.telemetry()
@@ -149,14 +212,16 @@ def coverage(sid: str, t: Optional[str] = None):
     eff = _eff_settings()
     iq = iono.query(st["lat"], st["lon"], tt, eff["ssn"])
     fp, h = iq["fp_mhz"], iq["h_km"]
-    f_op = settings["freq_mhz"]
+    # the widest reachable annulus is at the lowest operating frequency
+    f_min = settings["freq_min_mhz"]
     d_max = geo.max_hop_range_km(h)
-    d_min = geo.min_hop_range_km(fp, f_op, h)
+    d_min = geo.min_hop_range_km(fp, f_min, h)
     iono_ok = d_min is not None
     return {
         "station": sid,
         "fp_mhz": fp, "h_km": h, "source": iq["source"],
-        "f_op_mhz": f_op,
+        "f_min_mhz": f_min,
+        "muf_max_mhz": round(geo.muf_max_mhz(fp, h), 1),
         "iono_supported": iono_ok,
         "min_km": round(d_min, 1) if iono_ok else None,
         "max_km": round(d_max, 1),
@@ -236,6 +301,74 @@ async def import_upload(files: list[UploadFile] = File(...)):
     }
 
 
+# ── auto-fetch from the UCAR COSMIC-2 archive ─────────────────────────────────
+
+class FetchIn(BaseModel):
+    start: str   # YYYY-MM-DD (UTC day)
+    end: str
+
+
+@app.post("/api/fetch")
+def fetch_start(body: FetchIn):
+    """Kick off a background download+process job for a UTC date range."""
+    try:
+        return cosmic2_fetch.start(iono, body.start, body.end)
+    except cosmic2_fetch.FetchError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/fetch")
+def fetch_status():
+    """Poll the current/most-recent auto-fetch job's progress."""
+    return cosmic2_fetch.status()
+
+
+@app.post("/api/fetch/cancel")
+def fetch_cancel():
+    try:
+        return cosmic2_fetch.cancel()
+    except cosmic2_fetch.FetchError as e:
+        raise HTTPException(400, str(e))
+
+
+# ── CSV export / import ───────────────────────────────────────────────────────
+
+@app.get("/api/export/csv")
+def export_csv():
+    """Download the loaded profile table as CSV (round-trips via /api/import/csv)."""
+    text = cosmic2_csv.profiles_to_csv(iono.profiles, settings["freq_min_mhz"])
+    return Response(
+        content=text,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=cosmic2_profiles.csv"},
+    )
+
+
+@app.post("/api/import/csv")
+async def import_csv(files: list[UploadFile] = File(...)):
+    profs, errors = [], []
+    for uf in files:
+        raw = await uf.read()
+        try:
+            text = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            text = raw.decode("latin-1")
+        p, e = cosmic2_csv.csv_to_profiles(text)
+        profs.extend(p)
+        errors.extend(e)
+    added = iono.add_profiles(profs)
+    tr = iono.time_range()
+    return {
+        "imported": added,
+        "duplicates": len(profs) - added,
+        "skipped": errors[:50],
+        "n_skipped": len(errors),
+        "total": len(iono.profiles),
+        "time_min": tr[0].isoformat() + "Z" if tr else None,
+        "time_max": tr[1].isoformat() + "Z" if tr else None,
+    }
+
+
 @app.get("/api/ionosphere/grid")
 def iono_grid(t: Optional[str] = None, res: float = 4.0):
     res = max(2.0, min(10.0, res))
@@ -280,14 +413,15 @@ def _endpoints(body: LinkIn):
 @app.post("/api/link")
 def link(body: LinkIn):
     a, b = _endpoints(body)
-    return linkplan.compute_hop(a, b, iono, _parse_t(body.t), _eff_settings())
+    return linkplan.compute_hop(a, b, iono, _parse_t(body.t), _eff_settings(), _bounce_pts())
 
 
 @app.post("/api/route")
 def route(body: LinkIn):
     a, b = _endpoints(body)
     tel = store.telemetry()
-    return linkplan.compute_route(a, b, store.all(), tel, iono, _parse_t(body.t), _eff_settings())
+    return linkplan.compute_route(a, b, store.all(), tel, iono, _parse_t(body.t),
+                                  _eff_settings(), _bounce_pts())
 
 
 @app.post("/api/transmit")
@@ -295,11 +429,13 @@ def transmit(body: LinkIn):
     """Compute the route and slew every involved antenna toward its next hop."""
     a, b = _endpoints(body)
     tel = store.telemetry()
-    result = linkplan.compute_route(a, b, store.all(), tel, iono, _parse_t(body.t), _eff_settings())
+    result = linkplan.compute_route(a, b, store.all(), tel, iono, _parse_t(body.t),
+                                    _eff_settings(), _bounce_pts())
     if result.get("feasible"):
         for h in result["hops"]:
-            store.set_pointing(h["from"], h["azimuth_ab"], h["elevation_deg"], h["to_code"])
-            store.set_pointing(h["to"], h["azimuth_ba"], h["elevation_deg"], h["from_code"])
+            muf_val = h.get("muf_mhz")
+            store.set_pointing(h["from"], h["azimuth_ab"], h.get("el_a", h["elevation_deg"]), h["to_code"], muf_val)
+            store.set_pointing(h["to"], h["azimuth_ba"], h.get("el_b", h["elevation_deg"]), h["from_code"], muf_val)
     return result
 
 

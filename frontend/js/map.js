@@ -3,7 +3,7 @@
 
 import { state, on, emit, timeISO, toast, escapeHtml } from "./state.js";
 import { api } from "./api.js";
-import { fpColorExpression } from "./colormap.js";
+import { fpColorExpression, opFreqColorExpression } from "./colormap.js";
 
 export let map = null;
 
@@ -109,6 +109,19 @@ function addLayers() {
     paint: { "line-color": "#fbbf24", "line-width": 1.1, "line-dasharray": [2, 2], "line-opacity": 0.8 },
   });
 
+  // persistent reflection footprints (burst radius) for usable profiles
+  map.addSource("profile-radius", { type: "geojson", data: EMPTY });
+  map.addLayer({
+    id: "profile-radius-fill", type: "fill", source: "profile-radius",
+    filter: ["==", ["get", "kind"], "annulus"],
+    paint: { "fill-color": opFreqColorExpression("muf"), "fill-opacity": 0.11, "fill-antialias": false },
+  });
+  map.addLayer({
+    id: "profile-radius-line", type: "line", source: "profile-radius",
+    filter: ["==", ["get", "kind"], "edge"],
+    paint: { "line-color": opFreqColorExpression("muf"), "line-width": 1.1, "line-opacity": 0.6 },
+  });
+
   // live GIRO ionosondes (E-region: max(foE, foEs))
   map.addSource("sondes", { type: "geojson", data: EMPTY });
   map.addLayer({
@@ -131,6 +144,19 @@ function addLayers() {
       "circle-stroke-width": ["case", ["==", ["get", "verdict"], "ACCEPT"], 1.8, 1],
       "circle-stroke-color": ["case", ["==", ["get", "verdict"], "ACCEPT"], "#ffffff", "rgba(255,255,255,.55)"],
       "circle-opacity": 0.92,
+    },
+  });
+
+  // custom MBG bounce points (user-placed reflection patches)
+  map.addSource("mbg", { type: "geojson", data: EMPTY });
+  map.addLayer({
+    id: "mbg-circle", type: "circle", source: "mbg",
+    paint: {
+      "circle-radius": 7,
+      "circle-color": "#e879f9",
+      "circle-stroke-width": 2,
+      "circle-stroke-color": "#ffffff",
+      "circle-opacity": 0.95,
     },
   });
 
@@ -160,21 +186,35 @@ function addLayers() {
     filter: ["==", ["get", "kind"], "node"],
     paint: {
       "circle-radius": 6,
-      "circle-color": "#fbbf24",
+      // measurement-backed reflections glow green; modelled ones amber
+      "circle-color": ["case", ["get", "backed"], "#34d399", "#fbbf24"],
       "circle-opacity": 0.9,
       "circle-stroke-width": 6,
-      "circle-stroke-color": "#fbbf24",
-      "circle-stroke-opacity": 0.18,
+      "circle-stroke-color": ["case", ["get", "backed"], "#34d399", "#fbbf24"],
+      "circle-stroke-opacity": ["case", ["get", "backed"], 0.3, 0.18],
     },
   });
 }
 
 function wireMapEvents() {
   map.on("click", (e) => {
+    const lon = ((e.lngLat.lng + 540) % 360) - 180;
     if (state.mode === "sim" && state.tool === "add") {
-      emit("map:add", { lat: e.lngLat.lat, lon: ((e.lngLat.lng + 540) % 360) - 180 });
+      emit("map:add", { lat: e.lngLat.lat, lon });
+    } else if (state.mode === "sim" && state.tool === "mbg") {
+      emit("mbg:add", { lat: e.lngLat.lat, lon });
     }
   });
+
+  map.on("click", "mbg-circle", (e) => {
+    if (state.mode === "sim" && state.tool === "add") return;
+    const id = e.features[0].properties.id;
+    if (state.mode === "sim" && state.tool === "delete") { emit("mbg:delete", { id }); }
+    else { emit("mbg:click", { id }); }
+    e.preventDefault?.();
+  });
+  map.on("mouseenter", "mbg-circle", () => { map.getCanvas().style.cursor = "pointer"; });
+  map.on("mouseleave", "mbg-circle", () => { map.getCanvas().style.cursor = ""; });
 
   map.on("click", "profiles-circle", (e) => {
     if (state.mode === "sim" && state.tool === "add") return;
@@ -248,28 +288,113 @@ export function renderProfiles() {
   const feats = state.profiles.map((p) => ({
     type: "Feature",
     properties: {
-      fp: p.fp_mhz, h: p.h_peak_km, verdict: p.verdict, score: p.reality_score,
+      fp: p.fp_mhz, h: p.h_peak_km, muf: mufMax(p.fp_mhz, p.h_peak_km),
+      verdict: p.verdict, score: p.reality_score,
       conf: p.confidence, time: p.time, file: p.file, sat: p.sat_id, occ: p.occ_type,
     },
     geometry: { type: "Point", coordinates: [p.lon, p.lat] },
   }));
   map.getSource("profiles").setData({ type: "FeatureCollection", features: feats });
+  applyThreshold();
+}
+
+// ── custom MBG bounce points ─────────────────────────────────────────
+export function renderMbg() {
+  if (!map || !map.getSource("mbg")) return;
+  const feats = (state.mbg || []).map((m) => ({
+    type: "Feature",
+    properties: { id: m.id, name: m.name, fp: m.fp_mhz, h: m.h_km, muf: mufMax(m.fp_mhz, m.h_km) },
+    geometry: { type: "Point", coordinates: [m.lon, m.lat] },
+  }));
+  map.getSource("mbg").setData({ type: "FeatureCollection", features: feats });
+  scheduleFootprints();   // MBG points contribute footprints too
+}
+
+// ── usability threshold (declutter) + reflection footprints ──────────
+
+let footprintTimer = null;
+let footprintOverflowed = false;
+
+// Show only patches whose max usable frequency clears the min operating
+// frequency; refresh footprints.
+export function applyThreshold() {
+  if (!map || !map.getLayer("profiles-circle")) return;
+  const fMin = +state.settings.freq_min_mhz || 0;
+  map.setFilter("profiles-circle", [">=", ["get", "muf"], fMin]);
+  scheduleFootprints();
+}
+
+function scheduleFootprints() {
+  clearTimeout(footprintTimer);
+  footprintTimer = setTimeout(renderFootprints, 160);
+}
+
+const FOOTPRINT_CAP = 600;
+
+export function renderFootprints() {
+  const src = map?.getSource("profile-radius");
+  if (!src) return;
+  if (!state.footprintsVisible) { src.setData(EMPTY); footprintOverflowed = false; return; }
+
+  const fMin = +state.settings.freq_min_mhz || 0;   // also the usability threshold
+  // measured footprints + custom MBG points, unified shape {lat, lon, h, fp}
+  const all = [
+    ...state.profiles.map((p) => ({ lat: p.lat, lon: p.lon, h: p.h_peak_km, fp: p.fp_mhz })),
+    ...(state.mbg || []).map((m) => ({ lat: m.lat, lon: m.lon, h: m.h_km, fp: m.fp_mhz })),
+  ];
+  const usable = all.filter((p) => mufMax(p.fp, p.h) >= fMin);
+  const list = usable.slice(0, FOOTPRINT_CAP);
+
+  const feats = [];
+  for (const p of list) {
+    const muf = mufMax(p.fp, p.h);
+    const dMax = maxHopKm(p.h) / 2;
+    // widest usable annulus uses the station's lowest operating frequency
+    const dMinHop = minHopKm(p.fp, fMin, p.h);
+    const outer = ringCoords(p.lat, p.lon, dMax, 36);
+    const inner = (dMinHop !== null && dMinHop > 4) ? ringCoords(p.lat, p.lon, dMinHop / 2, 36) : null;
+    feats.push({
+      type: "Feature", properties: { kind: "annulus", muf },
+      geometry: { type: "Polygon", coordinates: inner ? [outer, inner] : [outer] },
+    });
+    feats.push({
+      type: "Feature", properties: { kind: "edge", muf },
+      geometry: { type: "LineString", coordinates: outer },
+    });
+  }
+  src.setData({ type: "FeatureCollection", features: feats });
+
+  // notify once when we clip, and once when clipping clears
+  if (usable.length > FOOTPRINT_CAP && !footprintOverflowed) {
+    footprintOverflowed = true;
+    toast(`Showing ${FOOTPRINT_CAP} of ${usable.length} footprints — raise Min fp to refine`, "");
+  } else if (usable.length <= FOOTPRINT_CAP) {
+    footprintOverflowed = false;
+  }
 }
 
 function showProfilePopup(f, lngLat) {
   const p = f.properties;
   const ok = p.verdict === "ACCEPT";
+  const fMin = state.settings.freq_min_mhz;
+  const muf = +p.muf || mufMax(+p.fp, +p.h);
+  const outerR = Math.round(maxHopKm(+p.h) / 2);
+  const innerHop = minHopKm(+p.fp, fMin, +p.h);
+  const innerR = (innerHop !== null && innerHop > 4) ? Math.round(innerHop / 2) : null;
+  const radiusTxt = innerR !== null ? `${innerR}–${outerR} km` : `0–${outerR} km`;
   const html = `
     <div class="pp-title">COSMIC-2 E${escapeHtml(p.sat)} · ${escapeHtml(p.occ)}
       <span class="pill ${ok ? "online" : "offline"}">${escapeHtml(p.verdict)}</span></div>
     <div class="pp-row"><span class="k">Time</span><span class="v">${escapeHtml((p.time || "").replace("T", " ").slice(0, 16))}Z</span></div>
     <div class="pp-row"><span class="k">Plasma freq (E-region)</span><span class="v">${(+p.fp).toFixed(2)} MHz</span></div>
     <div class="pp-row"><span class="k">Reflection altitude</span><span class="v">${(+p.h).toFixed(1)} km</span></div>
+    <div class="pp-row"><span class="k">Max usable op-freq</span><span class="v">${muf.toFixed(1)} MHz</span></div>
+    <div class="pp-row"><span class="k">Usable radius @ ${Math.round(fMin)} MHz</span><span class="v">${radiusTxt}</span></div>
     <div class="pp-row"><span class="k">Meteor-spike score</span><span class="v">${p.score ?? "—"}/10 (${Math.round((p.conf ?? 0) * 100)}%)</span></div>
     <div class="pp-row"><span class="k">File</span><span class="v" style="font-size:9px">${escapeHtml(p.file)}</span></div>
     <div class="hint" style="font-size:10px;color:#7d8fa8;margin-top:6px">
-      Dashed rings: ground band where a station could use this reflection point
-      at ${state.settings.freq_mhz} MHz.</div>`;
+      Dashed rings: ground band where a station could use this reflection point at its
+      lowest operating frequency (${Math.round(fMin)} MHz).</div>`;
   const popup = new maplibregl.Popup({ className: "gcs-popup", maxWidth: "300px" })
     .setLngLat(lngLat).setHTML(html).addTo(map);
 
@@ -278,8 +403,9 @@ function showProfilePopup(f, lngLat) {
 }
 
 function drawProfileDonut(lat, lon, fp, h) {
-  // distances from the reflection point to a usable station = half hop length
-  const f = state.settings.freq_mhz;
+  // distances from the reflection point to a usable station = half hop length;
+  // the widest usable band is at the station's lowest operating frequency
+  const f = state.settings.freq_min_mhz;
   const dMax = maxHopKm(h) / 2;
   const dMin = minHopKm(fp, f, h);
   const feats = [];
@@ -408,6 +534,11 @@ export function flyToStation(s, zoom = 4.4) {
   map.flyTo({ center: [s.lon, s.lat], zoom: Math.max(map.getZoom(), zoom), speed: 1.6 });
 }
 
+export function mapCenter() {
+  const c = map.getCenter();
+  return { lat: +c.lat.toFixed(4), lon: +(((c.lng + 540) % 360) - 180).toFixed(4) };
+}
+
 // ── tooltip ──────────────────────────────────────────────────────────
 
 const ttEl = () => document.getElementById("tooltip");
@@ -433,6 +564,7 @@ export function renderTooltip() {
     <div class="tt-row"><span class="k">Antenna az / el</span>
       <span class="v">${pt ? `${pt.az.toFixed(0)}° / ${pt.el.toFixed(0)}°` : "—"}</span></div>
     <div class="tt-row"><span class="k">Target</span><span class="v">${pt?.target ? escapeHtml(pt.target) : "parked"}</span></div>
+    ${pt?.frequency_mhz ? `<div class="tt-row"><span class="k">Frequency</span><span class="v">${pt.frequency_mhz.toFixed(2)} MHz</span></div>` : ""}
     <div class="tt-row"><span class="k">SNR</span><span class="v">${t ? t.snr_db + " dB" : "—"}</span></div>
     <div class="tt-row"><span class="k">Bursts/hr</span><span class="v">${t ? t.bursts_per_hr : "—"}</span></div>`;
 }
@@ -499,7 +631,8 @@ export function drawRoute(route) {
         geometry: { type: "LineString", coordinates: h.path },
       });
       feats.push({
-        type: "Feature", properties: { kind: "node", fp: h.reflection.fp_mhz },
+        type: "Feature",
+        properties: { kind: "node", fp: h.reflection.fp_mhz, backed: !!h.reflection.cosmic2_backed },
         geometry: { type: "Point", coordinates: [h.reflection.lon, h.reflection.lat] },
       });
     }
@@ -587,6 +720,8 @@ function startRaf() {
 // ── client-side geodesy (mirrors backend/geometry.py) ───────────────
 
 function maxHopKm(h) { return 2 * R_E * Math.acos(R_E / (R_E + h)); }
+function secMax(h) { return 1 / Math.sqrt(1 - (R_E / (R_E + h)) ** 2); }
+function mufMax(fp, h) { return fp * secMax(h); }   // max usable op-frequency of a patch
 
 function minHopKm(fp, f, h) {
   if (fp <= 0) return null;
@@ -628,6 +763,9 @@ function ringCoords(lat, lon, radiusKm, n = 72) {
 on("telemetry", () => { updateMarkerClasses(); renderTooltip(); });
 on("time", () => { refreshIono(); refreshCoverage(); });
 on("iono", () => refreshIono(true));
-on("settings", () => { refreshIono(true); refreshCoverage(); });
+on("settings", () => { refreshIono(true); refreshCoverage(); scheduleFootprints(); });
+on("fpthreshold", applyThreshold);
+on("footprints:toggle", renderFootprints);
+on("mbg", renderMbg);
 on("select", updateMarkerClasses);
 on("linksel", updateMarkerClasses);

@@ -47,6 +47,7 @@
   <div class="sb-head">
     <span class="sb-title">STATIONS</span>
     <span class="sb-count" id="sb-count">0</span>
+    <button id="sb-add" class="sb-add" title="Add a new station at the map centre">+ Add</button>
   </div>
   <input id="sb-search" type="text" placeholder="Search stations…" autocomplete="off">
   <div id="sb-list"></div>
@@ -60,6 +61,7 @@
   <button data-tool="select" class="active" title="Select / move stations"><span>⊹</span>Select</button>
   <button data-tool="add" title="Click the map to place a new station"><span>+</span>Add</button>
   <button data-tool="link" title="Click two stations to plan a transmission"><span>⚡</span>Link</button>
+  <button data-tool="mbg" title="Click the map to drop a meteor-burst bounce point"><span>◆</span>MBG</button>
   <button data-tool="delete" title="Click a station to remove it"><span>✕</span>Remove</button>
   <div class="simbar-hint" id="sim-hint"></div>
 </div>
@@ -73,11 +75,20 @@
   <label class="switch" title="Toggle ionosphere plasma-frequency overlay">
     <input type="checkbox" id="tb-iono" checked><i></i><span>Ionosphere</span>
   </label>
-  <label class="switch" title="Toggle live GIRO ionosonde stations">
-    <input type="checkbox" id="tb-sondes" checked><i></i><span>Ionosondes</span>
+  <label class="switch" title="Toggle measured reflection footprints (burst radius rings)">
+    <input type="checkbox" id="tb-footprints"><i></i><span>Footprints</span>
   </label>
-  <div class="legend">
+  <div class="tb-sep"></div>
+  <div class="tb-thresh" title="Show only patches whose max usable frequency clears this minimum operating frequency — declutters the map and sets the station's lowest operating frequency">
+    <span class="tb-thresh-lbl">Min op freq</span>
+    <input id="tb-opfreq" type="range" min="15" max="60" step="1" value="25">
+    <span id="tb-opfreq-val" class="mono">25 MHz</span>
+  </div>
+  <div class="legend" title="Plasma frequency of COSMIC-2 reflection points">
     <span>0</span><div id="legend-grad"></div><span>8+ MHz</span>
+  </div>
+  <div class="legend" id="legend-op" style="display:none" title="Max usable operating frequency of meteor-burst footprints">
+    <span>10</span><div id="legend-grad-op"></div><span>45 MHz</span>
   </div>
 </footer>
 

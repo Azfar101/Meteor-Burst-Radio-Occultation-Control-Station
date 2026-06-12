@@ -392,20 +392,6 @@
     }
   },
   {
-    "id": "mbs-sha",
-    "code": "MBS-SHA",
-    "name": "Shanghai",
-    "region": "East Asia",
-    "lat": 31.23,
-    "lon": 121.47,
-    "builtin": true,
-    "antenna": {
-      "type": "Yagi 5-el array",
-      "gain_dbi": 12.0,
-      "tx_power_w": 1000
-    }
-  },
-  {
     "id": "mbs-sel",
     "code": "MBS-SEL",
     "name": "Seoul",

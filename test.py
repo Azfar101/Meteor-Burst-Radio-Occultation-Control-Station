@@ -7,7 +7,7 @@ import datetime
 from meteor_spike_classifier import MeteorSpikeClassifier
 # Open the file
 
-folder_path = Path('asd')
+folder_path = Path('data\\2026')
 output_folder = Path('csv')
 output_folder.mkdir(parents=True, exist_ok=True)
 plasma_freqs = []
@@ -17,7 +17,9 @@ count_52 = 0
 total_files = 0
 all_location_52 = []
 no_nan = 0
-for file in folder_path.glob('*.0001_nc'):
+freq_threshold = 30 #MHz
+
+for file in folder_path.rglob('*.0001_nc'):
     print("--------------------------------------------------------------")
     print(f"Processing file: {file.name}")
     total_files += 1
@@ -30,7 +32,7 @@ for file in folder_path.glob('*.0001_nc'):
 
 
     # --- Electron density profile ---
-    ed = ds.variables['ELEC_dens'][:]  # Electron density (electrons/m³)
+    ed = ds.variables['ELEC_dens'][:]  # Electron density (electrons/cm³)
     ed[ed < 0] = np.nan  # Replace negative values with NaN
     #ed[ed > 1e12] = np.nan  # Replace unphysically high values with NaN
     ed_idk = []
@@ -97,25 +99,24 @@ for file in folder_path.glob('*.0001_nc'):
         no_nan += 1
         print(f"Optimal reflection altitude: {h_peak:.1f} km")
         print(f"Plasma frequency there: {fp_MHz:.2f} MHz")
-        if fp_MHz > np.sqrt(1-(6378/(6378+h_peak))**2)*30:
+        if fp_MHz > np.sqrt(1-(6378/(6378+h_peak))**2)*freq_threshold:
             count_52 += 1
             classifier = MeteorSpikeClassifier()
             # Create classifier and classify
             verdict, details = classifier.classify(alt, Ne)
             max_theta = np.rad2deg(np.arccos(6378/(6378+h_peak)))
-            sin_theta_crit = np.sqrt(1-fp_MHz**2/30**2)
+            sin_theta_crit = np.sqrt(1-fp_MHz**2/freq_threshold**2)
             xx = np.pi - np.arcsin(sin_theta_crit*(6378+h_peak)/6378)
             min_theta = 180 - np.rad2deg(xx + np.arcsin(sin_theta_crit))
             all_location_52.append((dt, perigee_lat, perigee_lon, h_peak, fp_MHz, max_theta, min_theta, verdict, details['reality_score'],details['confidence']))
-            if verdict == "ACCEPT":
+            """if verdict == "ACCEPT":
                 aewkfbjruwernaads=1
                 fig, axes = plt.subplots(figsize=(8, 5))
                 axes.plot(Ne,alt, label='Electron Density Profile')
                 axes.set_xlabel("Electron Density (e/cm³)")
                 axes.set_ylabel("Altitude (km)")
                 axes.set_title(f"Profile with Suspected Meteor Trail Spike - {file.stem}")
-                axes.grid(True)
-
+                axes.grid(True)"""
         plasma_freqs.append(fp_MHz)
 
     # Extract time from global attributes

@@ -148,10 +148,11 @@ class StationStore:
         self._save()
 
     # ── pointing (set when a link/route is computed) ────────────────────
-    def set_pointing(self, sid, az, el, target_code):
+    def set_pointing(self, sid, az, el, target_code, frequency_mhz=None):
         self.pointing[sid] = {
             "az": round(az, 1), "el": round(el, 1),
             "target": target_code, "since": time.time(),
+            "frequency_mhz": round(frequency_mhz, 2) if frequency_mhz is not None else None,
         }
 
     # ── simulated telemetry ─────────────────────────────────────────────
@@ -183,6 +184,17 @@ class StationStore:
 
             deg = 1.0 if status == "online" else (0.55 if status == "degraded" else 0.0)
             pt = self.pointing.get(sid)
+            if pt:
+                pt_out = {
+                    "az": pt["az"], "el": pt["el"],
+                    "target": pt["target"], "since": pt["since"],
+                    "frequency_mhz": pt.get("frequency_mhz"),
+                }
+            else:
+                pt_out = {
+                    "az": round(h1 * 360, 1), "el": 12.0,
+                    "target": None, "frequency_mhz": None,
+                }
 
             out[sid] = {
                 "status": status,
@@ -197,6 +209,6 @@ class StationStore:
                 "queue_pkts": 0 if status == "offline" else int(abs(wob) * 14 + h3 * 5),
                 "bursts_per_hr": 0 if status == "offline" else int(40 + wob * 18 + h1 * 25),
                 "last_burst_s": int(2 + abs(wob) * 40),
-                "pointing": pt or {"az": round(h1 * 360, 1), "el": 12.0, "target": None},
+                "pointing": pt_out,
             }
         return out

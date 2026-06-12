@@ -5,12 +5,12 @@ import { state, on, emit, stationById, timeISO, toast } from "./state.js";
 import { api } from "./api.js";
 import {
   initMap, syncStations, renderProfiles, refreshIono, renderSondes,
-  setSondesVisible, setBasemap,
+  setSondesVisible, setBasemap, renderMbg, mapCenter,
   drawRoute, clearRoute, flyToStation, setMarkersDraggable, clearCoverage,
 } from "./map.js";
 import {
   renderSidebar, selectStation, deselect, closePanel,
-  openRoutePanel, openSettingsModal, openImportModal, updateDataChip,
+  openRoutePanel, openSettingsModal, openImportModal, updateDataChip, openMbgPanel,
 } from "./panels.js";
 import { initTimebar } from "./timebar.js";
 
@@ -27,6 +27,13 @@ async function loadTelemetry() {
     state.telemetry = await api.telemetry();
     emit("telemetry");
   } catch { /* server briefly unavailable — keep last values */ }
+}
+
+async function loadMbg() {
+  try {
+    state.mbg = await api.mbgPoints();
+    renderMbg();
+  } catch { /* keep last */ }
 }
 
 async function loadProfiles() {
@@ -136,12 +143,13 @@ const TOOL_HINTS = {
   select: "Drag stations to move them",
   add: "Click anywhere on the map to place a station",
   link: "Click source station, then destination",
-  delete: "Click a station to remove it",
+  mbg: "Click the map to drop a meteor-burst bounce point",
+  delete: "Click a station or MBG point to remove it",
 };
 
 function setTool(tool) {
   state.tool = tool;
-  document.body.classList.remove("tool-add", "tool-delete", "tool-link");
+  document.body.classList.remove("tool-add", "tool-delete", "tool-link", "tool-mbg");
   if (state.mode === "sim" && tool !== "select") document.body.classList.add(`tool-${tool}`);
   document.querySelectorAll("#simbar button[data-tool]").forEach((b) =>
     b.classList.toggle("active", b.dataset.tool === tool));
@@ -161,6 +169,16 @@ function wireEvents() {
 
   document.getElementById("btn-settings").addEventListener("click", openSettingsModal);
   document.getElementById("btn-import").addEventListener("click", openImportModal);
+  document.getElementById("sb-add").addEventListener("click", async () => {
+    try {
+      const c = mapCenter();
+      const s = await api.addStation({ name: "New Station", lat: c.lat, lon: c.lon });
+      await loadStations();
+      selectStation(s.id);
+      flyToStation(s);
+      toast(`Station ${s.code} added — edit its name/position in the panel`, "ok");
+    } catch (e) { toast(e.message, "err"); }
+  });
   document.getElementById("btn-theme").addEventListener("click", () =>
     applyTheme(state.theme === "light" ? "dark" : "light"));
 
@@ -199,6 +217,21 @@ function wireEvents() {
       toast(`Station ${s.code} placed — drag with Select tool to adjust`, "ok");
     } catch (e) { toast(e.message, "err"); }
   });
+
+  on("mbg:add", async ({ lat, lon }) => {
+    try {
+      const m = await api.addMbg({ lat, lon });
+      await loadMbg();
+      openMbgPanel(m.id);
+      toast(`Bounce point ${m.name} placed — set its height & plasma freq`, "ok");
+    } catch (e) { toast(e.message, "err"); }
+  });
+  on("mbg:click", ({ id }) => openMbgPanel(id));
+  on("mbg:delete", async ({ id }) => {
+    try { await api.deleteMbg(id); await loadMbg(); toast("MBG point removed", "ok"); }
+    catch (e) { toast(e.message, "err"); }
+  });
+  on("mbg:reload", loadMbg);
 
   on("station:delete", async ({ id }) => {
     try {
@@ -251,6 +284,7 @@ async function boot() {
     await loadStations();
     await loadTelemetry();
     await loadProfiles();
+    await loadMbg();
     initTimebar();
     wireEvents();
     setMode("ops");

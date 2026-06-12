@@ -2,6 +2,8 @@
 // around now), play/pause animation, LIVE mode, ionosphere toggle.
 
 import { state, on, emit, fmtTime } from "./state.js";
+import { api } from "./api.js";
+import { opFreqGradientCss } from "./colormap.js";
 
 let t0 = null;   // Date range covered by the slider
 let t1 = null;
@@ -36,13 +38,78 @@ export function initTimebar() {
     emit("iono");
   });
 
-  document.getElementById("tb-sondes").addEventListener("change", (e) => {
-    state.sondesVisible = e.target.checked;
-    emit("sondes:toggle");
-  });
+  initThresholdControls();
 
   on("profiles", () => { computeRange(); updateLabel(); });
   updateLabel();
+}
+
+// ── minimum operating frequency + footprint toggle ───────────────────
+// The slider sets the station's lowest operating frequency, which doubles as
+// the "usable patch" threshold: a patch shows iff its max usable frequency
+// (fp·sec at grazing) clears this value.
+
+let saveThreshTimer = null;
+
+function initThresholdControls() {
+  // restore persisted values
+  const savedT = parseFloat(localStorage.getItem("mbc-opfreq-min"));
+  if (!Number.isNaN(savedT)) state.settings.freq_min_mhz = savedT;
+  state.footprintsVisible = localStorage.getItem("mbc-footprints") === "1";
+
+  const grad = document.getElementById("legend-grad-op");
+  if (grad) grad.style.background = opFreqGradientCss();
+
+  const slider = document.getElementById("tb-opfreq");
+  const valEl = document.getElementById("tb-opfreq-val");
+  const fp = document.getElementById("tb-footprints");
+  slider.value = String(state.settings.freq_min_mhz);
+  valEl.textContent = `${Math.round(state.settings.freq_min_mhz)} MHz`;
+  fp.checked = state.footprintsVisible;
+
+  slider.addEventListener("input", () => {
+    let v = +slider.value;
+    if (v > state.settings.freq_max_mhz) v = state.settings.freq_max_mhz;  // keep min ≤ max
+    state.settings.freq_min_mhz = v;
+    slider.value = String(v);
+    valEl.textContent = `${Math.round(v)} MHz`;
+    localStorage.setItem("mbc-opfreq-min", String(v));
+    emit("fpthreshold");                       // cheap: map filter + footprints
+    clearTimeout(saveThreshTimer);             // debounce backend save + route recompute
+    saveThreshTimer = setTimeout(async () => {
+      try {
+        const saved = await api.saveSettings({ freq_min_mhz: v });
+        Object.assign(state.settings, saved);
+        emit("settings");
+      } catch { /* offline — display filter still applied locally */ }
+    }, 500);
+  });
+
+  fp.addEventListener("change", () => {
+    state.footprintsVisible = fp.checked;
+    localStorage.setItem("mbc-footprints", fp.checked ? "1" : "0");
+    const legend = document.getElementById("legend-op");
+    if (legend) legend.style.display = fp.checked ? "" : "none";
+    emit("footprints:toggle");
+  });
+
+  // apply restored values to the map (listeners are already wired)
+  emit("fpthreshold");
+  if (state.footprintsVisible) {
+    document.getElementById("legend-op").style.display = "";
+    emit("footprints:toggle");
+  }
+
+  // keep the slider in sync when the Settings modal changes the range
+  on("settings", syncOpFreqSlider);
+}
+
+function syncOpFreqSlider() {
+  const slider = document.getElementById("tb-opfreq");
+  const valEl = document.getElementById("tb-opfreq-val");
+  if (!slider) return;
+  slider.value = String(state.settings.freq_min_mhz);
+  valEl.textContent = `${Math.round(state.settings.freq_min_mhz)} MHz`;
 }
 
 function computeRange() {

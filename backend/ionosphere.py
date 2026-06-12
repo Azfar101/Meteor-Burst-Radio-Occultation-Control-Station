@@ -184,6 +184,63 @@ class Ionosphere:
             "source": self._source_label(b, float(c2f[0])),
         }
 
+    def nearest_usable(self, lat, lon, t, freq_min=0.0, max_km=350.0):
+        """
+        Nearest *measured* COSMIC-2 patch to (lat, lon) at time t whose max usable
+        operating frequency (fp * sec at grazing) clears ``freq_min`` and that lies
+        within ``max_km``. Returns {fp_mhz, h_km, muf_max_mhz, dist_km, time} or
+        None — used to give hops a soft routing boost when their reflection point
+        sits on real measured ionization usable at the operating frequency.
+        """
+        t = _to_dt(t)
+        pool = self._pool_arrays()
+        if pool["fp"].size == 0:
+            return None
+        is_c2 = pool["c2"] >= 1.0
+        dt_h = np.abs(pool["ts"] - t.timestamp()) / 3600.0
+        # max usable operating frequency of each patch at grazing geometry
+        sec_max = 1.0 / np.sqrt(1.0 - (6371.0 / (6371.0 + pool["h"])) ** 2)
+        muf_max = pool["fp"] * sec_max
+        sel = is_c2 & (dt_h <= SEARCH_TIME_H) & (muf_max >= freq_min)
+        if not np.any(sel):
+            return None
+
+        plat = np.radians(pool["lat"][sel])
+        plon = np.radians(pool["lon"][sel])
+        qlat = math.radians(lat)
+        qlon = math.radians(lon)
+        a = (np.sin((plat - qlat) / 2) ** 2
+             + math.cos(qlat) * np.cos(plat) * np.sin((plon - qlon) / 2) ** 2)
+        d_km = 2.0 * 6371.0 * np.arcsin(np.sqrt(np.clip(a, 0, 1)))
+
+        k = int(np.argmin(d_km))
+        if d_km[k] > max_km:
+            return None
+        return {
+            "fp_mhz": round(float(pool["fp"][sel][k]), 3),
+            "h_km": round(float(pool["h"][sel][k]), 1),
+            "muf_max_mhz": round(float(muf_max[sel][k]), 1),
+            "dist_km": round(float(d_km[k]), 1),
+            # mirror the naive .timestamp() used when the pool was built
+            "time": datetime.datetime.fromtimestamp(float(pool["ts"][sel][k])).isoformat() + "Z",
+        }
+
+    def usable_patches(self, freq_min=0.0):
+        """
+        Loaded COSMIC-2 patches whose max usable frequency (fp * sec at grazing)
+        clears ``freq_min`` — i.e. the footprints visible on the map. Returned as
+        bounce-point dicts for the link planner (time-independent, matching the
+        on-screen footprints).
+        """
+        out = []
+        for p in self.profiles:
+            h = p["h_peak_km"]
+            sec_max = 1.0 / math.sqrt(1.0 - (6371.0 / (6371.0 + h)) ** 2)
+            if p["fp_mhz"] * sec_max >= freq_min:
+                out.append({"lat": p["lat"], "lon": p["lon"],
+                            "h_km": h, "fp_mhz": p["fp_mhz"], "source": "cosmic2"})
+        return out
+
     def grid(self, t, res_deg=4.0, ssn=70.0):
         """Regular lat/lon grid of fp for the map overlay."""
         t = _to_dt(t)

@@ -138,6 +138,73 @@ def muf_mhz(fp_mhz, d_km, h_km):
     return fp_mhz * sec_theta(d_km, h_km)
 
 
+def sec_max(h_km):
+    """Secant of the incidence angle at grazing (0° elevation) — the largest
+    obliquity geometry, where the secant law gives the highest usable frequency."""
+    return 1.0 / math.sqrt(1.0 - (R_E / (R_E + h_km)) ** 2)
+
+
+def muf_max_mhz(fp_mhz, h_km):
+    """
+    Highest operating frequency a reflection patch can ever support, reached at
+    the grazing (maximum-range) geometry: fp * sec(theta_grazing). A patch is
+    "usable" for an operating frequency f iff muf_max >= f — algebraically the
+    same test as the original research code (test.py).
+    """
+    return fp_mhz * sec_max(h_km)
+
+
+# ── 3-D bounce geometry (reflection off a specific patch, per input_latlon.py) ──
+
+def latlon_to_ecef(lat, lon, alt_km=0.0):
+    R = R_E + alt_km
+    la, lo = math.radians(lat), math.radians(lon)
+    return (R * math.cos(la) * math.cos(lo),
+            R * math.cos(la) * math.sin(lo),
+            R * math.sin(la))
+
+
+def _dot(a, b):
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+
+def _norm(a):
+    return math.sqrt(_dot(a, a))
+
+
+def bounce_geometry(lat_a, lon_a, alt_a, lat_b, lon_b, alt_b, lat_p, lon_p, h_p):
+    """
+    Geometry of a signal A -> patch P -> B, with P a real reflection point at
+    height h_p (not the great-circle midpoint). Mirrors input_latlon.py:
+
+      scatter angle at P (between the two rays), the secant-law factor
+      1/cos(scatter/2), and the elevation of P above each station's horizon.
+
+    Returns a dict, or None if degenerate. el_a / el_b < 0 means P is below
+    that station's horizon (not usable).
+    """
+    A = latlon_to_ecef(lat_a, lon_a, alt_a)
+    B = latlon_to_ecef(lat_b, lon_b, alt_b)
+    P = latlon_to_ecef(lat_p, lon_p, h_p)
+    vA = (P[0] - A[0], P[1] - A[1], P[2] - A[2])
+    vB = (P[0] - B[0], P[1] - B[1], P[2] - B[2])
+    nA, nB = _norm(vA), _norm(vB)
+    if nA < 1e-9 or nB < 1e-9:
+        return None
+    cos_scatter = max(-1.0, min(1.0, _dot(vA, vB) / (nA * nB)))
+    scatter = math.acos(cos_scatter)
+    # elevation = angle of the ray above the local horizon at each station
+    naA, naB = _norm(A), _norm(B)
+    el_a = math.degrees(math.acos(max(-1.0, min(1.0, _dot(vA, (-A[0], -A[1], -A[2])) / (nA * naA))))) - 90.0
+    el_b = math.degrees(math.acos(max(-1.0, min(1.0, _dot(vB, (-B[0], -B[1], -B[2])) / (nB * naB))))) - 90.0
+    return {
+        "scatter_deg": math.degrees(scatter),
+        "half_sec": 1.0 / max(math.cos(scatter / 2.0), 1e-6),
+        "el_a": el_a,
+        "el_b": el_b,
+    }
+
+
 def ring_coords(lat, lon, radius_km, n=72):
     """Closed geodesic circle as [lon, lat] list, antimeridian-unwrapped."""
     pts = []

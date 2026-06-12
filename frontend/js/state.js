@@ -7,7 +7,9 @@ export const state = {
   telemetry: {},
   profiles: [],
   profileRange: null,     // [Date, Date] | null
-  settings: { freq_mhz: 30, data_rate_kbps: 9.6, max_hops: 6, allow_meteor_mode: true, ssn: 70 },
+  settings: { freq_min_mhz: 25, freq_max_mhz: 45, data_rate_kbps: 9.6, max_hops: 6, allow_meteor_mode: true, ssn: 70, use_footprints_bounce: false },
+  footprintsVisible: false,  // persistent reflection-footprint rings
+  mbg: [],                   // custom MBG bounce points
   time: null,             // Date | null (null = live)
   selectedId: null,
   linkA: null,            // station id

@@ -28,6 +28,11 @@ export const api = {
   updateStation: (id, b) => req("PATCH", `/api/stations/${id}`, b),
   deleteStation: (id) => req("DELETE", `/api/stations/${id}`),
   resetStations: () => req("POST", "/api/stations/reset"),
+
+  mbgPoints: () => req("GET", "/api/mbg"),
+  addMbg: (b) => req("POST", "/api/mbg", b),
+  updateMbg: (id, b) => req("PATCH", `/api/mbg/${id}`, b),
+  deleteMbg: (id) => req("DELETE", `/api/mbg/${id}`),
   telemetry: () => req("GET", "/api/telemetry"),
   coverage: (id, t) => req("GET", `/api/stations/${id}/coverage?t=${encodeURIComponent(t)}`),
 
@@ -35,6 +40,13 @@ export const api = {
   clearProfiles: () => req("DELETE", "/api/profiles"),
   importFolder: (folder) => req("POST", "/api/import/folder", { folder }),
   importUpload: (formData) => req("POST", "/api/import/upload", formData),
+
+  fetchStart: (start, end) => req("POST", "/api/fetch", { start, end }),
+  fetchStatus: () => req("GET", "/api/fetch"),
+  fetchCancel: () => req("POST", "/api/fetch/cancel"),
+
+  exportCsvUrl: "/api/export/csv",
+  importCsv: (formData) => req("POST", "/api/import/csv", formData),
 
   ionoGrid: (t, res = 4) =>
     req("GET", `/api/ionosphere/grid?t=${encodeURIComponent(t)}&res=${res}`),
