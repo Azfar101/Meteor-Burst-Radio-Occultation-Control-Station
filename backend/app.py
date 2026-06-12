@@ -40,7 +40,7 @@ settings = {
     "allow_meteor_mode": True,
     "ssn": 70,
     "auto_ssn": True,   # drive the foE model with the live effective SSN
-    "use_footprints_bounce": False,  # bounce off visible footprints instead of the midpoint
+    "use_footprints_bounce": True,   # bounce off visible footprints instead of the midpoint
 }
 
 
