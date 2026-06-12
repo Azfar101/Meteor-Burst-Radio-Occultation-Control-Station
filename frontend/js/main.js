@@ -169,6 +169,15 @@ function wireEvents() {
 
   document.getElementById("btn-settings").addEventListener("click", openSettingsModal);
   document.getElementById("btn-import").addEventListener("click", openImportModal);
+  document.getElementById("btn-about").addEventListener("click", () => {
+    document.getElementById("about-overlay").style.display = "grid";
+  });
+  document.getElementById("about-close").addEventListener("click", () => {
+    document.getElementById("about-overlay").style.display = "none";
+  });
+  document.getElementById("about-overlay").addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.style.display = "none";
+  });
   document.getElementById("sb-add").addEventListener("click", async () => {
     try {
       const c = mapCenter();
@@ -266,6 +275,8 @@ function wireEvents() {
 
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
+      const about = document.getElementById("about-overlay");
+      if (about.style.display !== "none") { about.style.display = "none"; return; }
       document.getElementById("modal-root").innerHTML = "";
       if (state.route) clearLink();
       else deselect();

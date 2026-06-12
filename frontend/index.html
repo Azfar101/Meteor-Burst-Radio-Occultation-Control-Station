@@ -38,6 +38,7 @@
   <div class="top-right">
     <div class="chip" id="data-chip"><span class="dot"></span><span id="data-chip-text">foE model</span></div>
     <button id="btn-import" class="btn">⬆ Import data</button>
+    <button id="btn-about" class="btn" title="About the team">About Us</button>
     <button id="btn-theme" class="btn icon" title="Toggle light / dark theme">☀</button>
     <button id="btn-settings" class="btn icon" title="Settings">⚙</button>
   </div>
@@ -95,6 +96,48 @@
 <div id="tooltip"></div>
 <div id="modal-root"></div>
 <div id="toasts"></div>
+
+<div id="about-overlay" class="about-overlay" style="display:none">
+  <div class="about-modal">
+    <button class="about-close" id="about-close">✕</button>
+    <div class="about-header">
+      <div class="about-logo-wrap"><div class="logo"><span></span></div></div>
+      <div>
+        <div class="about-title">METEOR BURST NETWORK</div>
+        <div class="about-subtitle">Ground Control System · Development Team</div>
+      </div>
+    </div>
+    <div class="about-cards">
+      <div class="about-card leader">
+        <div class="about-avatar-wrap">
+          <img class="about-avatar" src="profile/azfar.png" alt="Azfar Azdi Arfakhsyad">
+        </div>
+        <div class="about-name">Azfar Azdi Arfakhsyad</div>
+        <div class="about-role">Robotics Master's Student</div>
+        <div class="about-org">Shizuoka University</div>
+        <a class="about-email" href="mailto:azfar.a.arfakhsyad.25@shizuoka.ac.jp">azfar.a.arfakhsyad.25@shizuoka.ac.jp</a>
+      </div>
+      <div class="about-card">
+        <div class="about-avatar-wrap">
+          <img class="about-avatar" src="profile/giga.png" alt="Giga Hidjrika Aura Adkhy">
+        </div>
+        <div class="about-name">Giga Hidjrika Aura Adkhy</div>
+        <div class="about-role">Jr. IT Engineer</div>
+        <div class="about-org">PT Pupuk Indonesia (Persero)</div>
+        <a class="about-email" href="mailto:gigahidjrikaaa@gmail.com">gigahidjrikaaa@gmail.com</a>
+      </div>
+      <div class="about-card">
+        <div class="about-avatar-wrap">
+          <img class="about-avatar" src="profile/hilmi.png" alt="Hilmi Nuruzzaman">
+        </div>
+        <div class="about-name">Hilmi Nuruzzaman</div>
+        <div class="about-role">Aerospace Engineer</div>
+        <div class="about-org">PT Telkomsat</div>
+        <a class="about-email" href="mailto:hilmizaman2002@gmail.com">hilmizaman2002@gmail.com</a>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script type="module" src="js/main.js"></script>
 </body>
