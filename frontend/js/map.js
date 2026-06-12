@@ -375,7 +375,6 @@ export function renderFootprints() {
 
 function showProfilePopup(f, lngLat) {
   const p = f.properties;
-  const ok = p.verdict === "ACCEPT";
   const fMin = state.settings.freq_min_mhz;
   const muf = +p.muf || mufMax(+p.fp, +p.h);
   const outerR = Math.round(maxHopKm(+p.h) / 2);
@@ -383,8 +382,7 @@ function showProfilePopup(f, lngLat) {
   const innerR = (innerHop !== null && innerHop > 4) ? Math.round(innerHop / 2) : null;
   const radiusTxt = innerR !== null ? `${innerR}–${outerR} km` : `0–${outerR} km`;
   const html = `
-    <div class="pp-title">COSMIC-2 E${escapeHtml(p.sat)} · ${escapeHtml(p.occ)}
-      <span class="pill ${ok ? "online" : "offline"}">${escapeHtml(p.verdict)}</span></div>
+    <div class="pp-title">COSMIC-2 E${escapeHtml(p.sat)} · ${escapeHtml(p.occ)}</div>
     <div class="pp-row"><span class="k">Time</span><span class="v">${escapeHtml((p.time || "").replace("T", " ").slice(0, 16))}Z</span></div>
     <div class="pp-row"><span class="k">Plasma freq (E-region)</span><span class="v">${(+p.fp).toFixed(2)} MHz</span></div>
     <div class="pp-row"><span class="k">Reflection altitude</span><span class="v">${(+p.h).toFixed(1)} km</span></div>

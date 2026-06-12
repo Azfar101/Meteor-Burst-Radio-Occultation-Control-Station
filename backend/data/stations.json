@@ -354,8 +354,8 @@
     "code": "MBS-BKK",
     "name": "Bangkok",
     "region": "Southeast Asia",
-    "lat": 13.76,
-    "lon": 100.5,
+    "lat": 13.1769,
+    "lon": 100.6693,
     "builtin": true,
     "antenna": {
       "type": "Yagi 5-el array",
@@ -382,8 +382,8 @@
     "code": "MBS-HKG",
     "name": "Hong Kong",
     "region": "East Asia",
-    "lat": 22.32,
-    "lon": 114.17,
+    "lat": 17.6701,
+    "lon": 103.8492,
     "builtin": true,
     "antenna": {
       "type": "Yagi 5-el array",
@@ -424,8 +424,8 @@
     "code": "MBS-SIN",
     "name": "Singapore",
     "region": "Southeast Asia",
-    "lat": 1.35,
-    "lon": 103.82,
+    "lat": 0.6697,
+    "lon": 94.3772,
     "builtin": true,
     "antenna": {
       "type": "Yagi 5-el array",
@@ -454,20 +454,6 @@
     "region": "Southeast Asia",
     "lat": -7.25,
     "lon": 112.75,
-    "builtin": true,
-    "antenna": {
-      "type": "Yagi 5-el array",
-      "gain_dbi": 12.0,
-      "tx_power_w": 1000
-    }
-  },
-  {
-    "id": "mbs-koe",
-    "code": "MBS-KOE",
-    "name": "Kupang",
-    "region": "Southeast Asia",
-    "lat": -10.17,
-    "lon": 123.58,
     "builtin": true,
     "antenna": {
       "type": "Yagi 5-el array",
@@ -525,6 +511,76 @@
     "lat": -33.87,
     "lon": 151.21,
     "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "b640670748",
+    "code": "MBS-X01",
+    "name": "Field Relay",
+    "region": "Custom",
+    "lat": -9.8277,
+    "lon": 94.6645,
+    "builtin": false,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "5be38a3cc1",
+    "code": "MBS-X02",
+    "name": "Field Relay",
+    "region": "Custom",
+    "lat": -10.2717,
+    "lon": 76.9862,
+    "builtin": false,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "e76489624c",
+    "code": "MBS-X03",
+    "name": "Field Relay",
+    "region": "Custom",
+    "lat": 18.423,
+    "lon": -24.0928,
+    "builtin": false,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "6e289dc7b2",
+    "code": "MBS-X04",
+    "name": "Field Relay",
+    "region": "Custom",
+    "lat": 2.3462,
+    "lon": -28.1339,
+    "builtin": false,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "6e363155a5",
+    "code": "MBS-X05",
+    "name": "Field Relay",
+    "region": "Custom",
+    "lat": 11.2366,
+    "lon": 104.9245,
+    "builtin": false,
     "antenna": {
       "type": "Yagi 5-el array",
       "gain_dbi": 12.0,
