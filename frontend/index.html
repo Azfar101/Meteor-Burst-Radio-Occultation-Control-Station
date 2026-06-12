@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MBC Ground Control — Meteor Burst Network</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<div id="map"></div>
+
+<header id="topbar">
+  <div class="brand">
+    <div class="logo"><span></span></div>
+    <div>
+      <div class="brand-title">METEOR BURST NETWORK</div>
+      <div class="brand-sub">Ground Control System · Radio Occultation Ion Density</div>
+    </div>
+  </div>
+  <nav class="modes">
+    <button data-mode="ops" class="active">OPERATIONS</button>
+    <button data-mode="sim">SIMULATION</button>
+  </nav>
+  <div class="top-right">
+    <div class="chip" id="data-chip"><span class="dot"></span><span id="data-chip-text">foE model</span></div>
+    <button id="btn-import" class="btn">⬆ Import data</button>
+    <button id="btn-theme" class="btn icon" title="Toggle light / dark theme">☀</button>
+    <button id="btn-settings" class="btn icon" title="Settings">⚙</button>
+  </div>
+</header>
+
+<aside id="sidebar">
+  <div class="sb-head">
+    <span class="sb-title">STATIONS</span>
+    <span class="sb-count" id="sb-count">0</span>
+  </div>
+  <input id="sb-search" type="text" placeholder="Search stations…" autocomplete="off">
+  <div id="sb-list"></div>
+</aside>
+<button id="sb-toggle" title="Toggle station list">☰</button>
+
+<aside id="rightpanel"></aside>
+
+<div id="simbar">
+  <div class="simbar-title">SIM TOOLS</div>
+  <button data-tool="select" class="active" title="Select / move stations"><span>⊹</span>Select</button>
+  <button data-tool="add" title="Click the map to place a new station"><span>+</span>Add</button>
+  <button data-tool="link" title="Click two stations to plan a transmission"><span>⚡</span>Link</button>
+  <button data-tool="delete" title="Click a station to remove it"><span>✕</span>Remove</button>
+  <div class="simbar-hint" id="sim-hint"></div>
+</div>
+
+<footer id="timebar">
+  <button id="tb-play" class="tb-btn" title="Play / pause">▶</button>
+  <button id="tb-live" class="tb-btn live" title="Jump to current time">LIVE</button>
+  <input id="tb-slider" type="range" min="0" max="1000" value="500">
+  <div id="tb-label" class="mono">—</div>
+  <div class="tb-sep"></div>
+  <label class="switch" title="Toggle ionosphere plasma-frequency overlay">
+    <input type="checkbox" id="tb-iono" checked><i></i><span>Ionosphere</span>
+  </label>
+  <label class="switch" title="Toggle live GIRO ionosonde stations">
+    <input type="checkbox" id="tb-sondes" checked><i></i><span>Ionosondes</span>
+  </label>
+  <div class="legend">
+    <span>0</span><div id="legend-grad"></div><span>8+ MHz</span>
+  </div>
+</footer>
+
+<div id="tooltip"></div>
+<div id="modal-root"></div>
+<div id="toasts"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

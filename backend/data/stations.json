@@ -1,0 +1,548 @@
+[
+  {
+    "id": "mbs-sea",
+    "code": "MBS-SEA",
+    "name": "Seattle",
+    "region": "North America",
+    "lat": 47.61,
+    "lon": -122.33,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-bld",
+    "code": "MBS-BLD",
+    "name": "Boulder",
+    "region": "North America",
+    "lat": 40.01,
+    "lon": -105.27,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-dal",
+    "code": "MBS-DAL",
+    "name": "Dallas",
+    "region": "North America",
+    "lat": 32.78,
+    "lon": -96.8,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-chi",
+    "code": "MBS-CHI",
+    "name": "Chicago",
+    "region": "North America",
+    "lat": 41.88,
+    "lon": -87.63,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-nyc",
+    "code": "MBS-NYC",
+    "name": "New York",
+    "region": "North America",
+    "lat": 40.71,
+    "lon": -74.01,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-mex",
+    "code": "MBS-MEX",
+    "name": "Mexico City",
+    "region": "North America",
+    "lat": 19.43,
+    "lon": -99.13,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-bsb",
+    "code": "MBS-BSB",
+    "name": "Brasília",
+    "region": "South America",
+    "lat": -15.79,
+    "lon": -47.88,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-sao",
+    "code": "MBS-SAO",
+    "name": "São Paulo",
+    "region": "South America",
+    "lat": -23.55,
+    "lon": -46.63,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-bue",
+    "code": "MBS-BUE",
+    "name": "Buenos Aires",
+    "region": "South America",
+    "lat": -34.6,
+    "lon": -58.38,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-scl",
+    "code": "MBS-SCL",
+    "name": "Santiago",
+    "region": "South America",
+    "lat": -33.45,
+    "lon": -70.67,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-lon",
+    "code": "MBS-LON",
+    "name": "London",
+    "region": "Europe",
+    "lat": 51.51,
+    "lon": -0.13,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-par",
+    "code": "MBS-PAR",
+    "name": "Paris",
+    "region": "Europe",
+    "lat": 48.86,
+    "lon": 2.35,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-mad",
+    "code": "MBS-MAD",
+    "name": "Madrid",
+    "region": "Europe",
+    "lat": 40.42,
+    "lon": -3.7,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-ber",
+    "code": "MBS-BER",
+    "name": "Berlin",
+    "region": "Europe",
+    "lat": 52.52,
+    "lon": 13.4,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-rom",
+    "code": "MBS-ROM",
+    "name": "Rome",
+    "region": "Europe",
+    "lat": 41.9,
+    "lon": 12.5,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-waw",
+    "code": "MBS-WAW",
+    "name": "Warsaw",
+    "region": "Europe",
+    "lat": 52.23,
+    "lon": 21.01,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-ath",
+    "code": "MBS-ATH",
+    "name": "Athens",
+    "region": "Europe",
+    "lat": 37.98,
+    "lon": 23.73,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-mow",
+    "code": "MBS-MOW",
+    "name": "Moscow",
+    "region": "Europe",
+    "lat": 55.76,
+    "lon": 37.62,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-ank",
+    "code": "MBS-ANK",
+    "name": "Ankara",
+    "region": "Middle East",
+    "lat": 39.93,
+    "lon": 32.86,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-cai",
+    "code": "MBS-CAI",
+    "name": "Cairo",
+    "region": "Middle East",
+    "lat": 30.04,
+    "lon": 31.24,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-ryd",
+    "code": "MBS-RYD",
+    "name": "Riyadh",
+    "region": "Middle East",
+    "lat": 24.71,
+    "lon": 46.68,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-dxb",
+    "code": "MBS-DXB",
+    "name": "Dubai",
+    "region": "Middle East",
+    "lat": 25.2,
+    "lon": 55.27,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-thr",
+    "code": "MBS-THR",
+    "name": "Tehran",
+    "region": "Middle East",
+    "lat": 35.69,
+    "lon": 51.39,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-khi",
+    "code": "MBS-KHI",
+    "name": "Karachi",
+    "region": "South Asia",
+    "lat": 24.86,
+    "lon": 67.0,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-del",
+    "code": "MBS-DEL",
+    "name": "New Delhi",
+    "region": "South Asia",
+    "lat": 28.61,
+    "lon": 77.21,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-bkk",
+    "code": "MBS-BKK",
+    "name": "Bangkok",
+    "region": "Southeast Asia",
+    "lat": 13.76,
+    "lon": 100.5,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-han",
+    "code": "MBS-HAN",
+    "name": "Hanoi",
+    "region": "Southeast Asia",
+    "lat": 21.03,
+    "lon": 105.85,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-hkg",
+    "code": "MBS-HKG",
+    "name": "Hong Kong",
+    "region": "East Asia",
+    "lat": 22.32,
+    "lon": 114.17,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-sha",
+    "code": "MBS-SHA",
+    "name": "Shanghai",
+    "region": "East Asia",
+    "lat": 31.23,
+    "lon": 121.47,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-sel",
+    "code": "MBS-SEL",
+    "name": "Seoul",
+    "region": "East Asia",
+    "lat": 37.57,
+    "lon": 126.98,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-tyo",
+    "code": "MBS-TYO",
+    "name": "Tokyo",
+    "region": "East Asia",
+    "lat": 35.68,
+    "lon": 139.69,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-sin",
+    "code": "MBS-SIN",
+    "name": "Singapore",
+    "region": "Southeast Asia",
+    "lat": 1.35,
+    "lon": 103.82,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-jkt",
+    "code": "MBS-JKT",
+    "name": "Jakarta",
+    "region": "Southeast Asia",
+    "lat": -6.21,
+    "lon": 106.85,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-sub",
+    "code": "MBS-SUB",
+    "name": "Surabaya",
+    "region": "Southeast Asia",
+    "lat": -7.25,
+    "lon": 112.75,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-koe",
+    "code": "MBS-KOE",
+    "name": "Kupang",
+    "region": "Southeast Asia",
+    "lat": -10.17,
+    "lon": 123.58,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-drw",
+    "code": "MBS-DRW",
+    "name": "Darwin",
+    "region": "Oceania",
+    "lat": -12.46,
+    "lon": 130.84,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-asp",
+    "code": "MBS-ASP",
+    "name": "Alice Springs",
+    "region": "Oceania",
+    "lat": -23.7,
+    "lon": 133.88,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-adl",
+    "code": "MBS-ADL",
+    "name": "Adelaide",
+    "region": "Oceania",
+    "lat": -34.93,
+    "lon": 138.6,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  },
+  {
+    "id": "mbs-syd",
+    "code": "MBS-SYD",
+    "name": "Sydney",
+    "region": "Oceania",
+    "lat": -33.87,
+    "lon": 151.21,
+    "builtin": true,
+    "antenna": {
+      "type": "Yagi 5-el array",
+      "gain_dbi": 12.0,
+      "tx_power_w": 1000
+    }
+  }
+]

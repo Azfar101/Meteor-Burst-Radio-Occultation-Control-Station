@@ -1,0 +1,19 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+.txt
+build/
+dist/
+deploy/
+*.spec
+*.egg-info/
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/ 
+*.tar.gz
+*.zip
+*.rar
+*.csv
+csv/
+*.0001_nc
