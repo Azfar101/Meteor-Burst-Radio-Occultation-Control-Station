@@ -429,7 +429,7 @@ for file in glob.glob("ionPrf_*.nc"):
 If you use this classifier in research, cite:
 ```
 Meteor Spike Classifier for COSMIC-2 ionPrf Data
-Author: Claude (Anthropic)
+Author: Azfar Azdi Arfakhsyad
 Date: April 2026
 Based on multi-criteria analysis of ionospheric electron density profiles
 ```

@@ -5,7 +5,7 @@ Meteor Spike Classifier for COSMIC-2 ionPrf Data
 Automatically detects and classifies electron density spikes in the meteor zone (95-120 km)
 as either real meteor trails or noise.
 
-Author: Claude (Anthropic)
+Author: Azfar Azdi Arfakhsyad
 Date: April 2026
 """
 
